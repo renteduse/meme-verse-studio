@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -167,6 +166,7 @@ const MemeCreator = () => {
       }
     } catch (error) {
       console.error("Failed to create meme:", error);
+      toast.error("Failed to create meme");
     } finally {
       setIsCreating(false);
       setShowSaveDialog(false);

@@ -11,6 +11,7 @@ export interface Meme {
   id: string;
   _id: string;
   imageUrl: string;
+  cloudinaryId?: string;
   topText: string;
   bottomText: string;
   creator: {
@@ -47,7 +48,8 @@ export const useMemes = () => {
   const formatMeme = (meme: any): Meme => ({
     id: meme._id,
     _id: meme._id,
-    imageUrl: meme.imageUrl.startsWith('http') ? meme.imageUrl : `${API_URL}${meme.imageUrl}`,
+    imageUrl: meme.imageUrl,
+    cloudinaryId: meme.cloudinaryId,
     topText: meme.topText || '',
     bottomText: meme.bottomText || '',
     creator: {

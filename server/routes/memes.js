@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const Meme = require('../models/Meme');
 const Comment = require('../models/Comment');
 const auth = require('../middleware/auth');
+const { uploadImage, deleteImage } = require('../utils/cloudinary');
 
 // Get all memes with pagination and sorting
 router.get('/', async (req, res) => {
@@ -93,22 +94,17 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Image size should be less than 5MB' });
     }
     
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = path.join(__dirname, '..', 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
+    // Upload to Cloudinary
+    const cloudinaryUpload = await uploadImage(image.tempFilePath);
+    
+    if (!cloudinaryUpload.success) {
+      return res.status(500).json({ success: false, message: 'Failed to upload image' });
     }
-    
-    // Generate unique filename
-    const fileName = `${uuidv4()}${path.extname(image.name)}`;
-    const filePath = path.join(uploadsDir, fileName);
-    
-    // Save file
-    await image.mv(filePath);
     
     // Create meme
     const meme = await Meme.create({
-      imageUrl: `/uploads/${fileName}`,
+      imageUrl: cloudinaryUpload.url,
+      cloudinaryId: cloudinaryUpload.public_id,
       topText: topText || '',
       bottomText: bottomText || '',
       creator: {
@@ -174,12 +170,9 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(401).json({ success: false, message: 'Not authorized to delete this meme' });
     }
     
-    // Delete the image file
-    if (meme.imageUrl && meme.imageUrl.startsWith('/uploads/')) {
-      const filePath = path.join(__dirname, '..', meme.imageUrl);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+    // Delete the image from Cloudinary if it exists
+    if (meme.cloudinaryId) {
+      await deleteImage(meme.cloudinaryId);
     }
     
     // Delete related comments

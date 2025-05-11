@@ -6,6 +6,9 @@ const MemeSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  cloudinaryId: {
+    type: String
+  },
   topText: {
     type: String,
     default: ''
