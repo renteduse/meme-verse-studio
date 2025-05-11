@@ -8,6 +8,7 @@ const path = require('path');
 const authRouter = require('./routes/auth');
 const memeRouter = require('./routes/memes');
 const commentRouter = require('./routes/comments');
+const profileRouter = require('./routes/profile');
 
 // Initialize express
 const app = express();
@@ -25,6 +26,7 @@ app.use(fileUpload({
 app.use('/api/auth', authRouter);
 app.use('/api/memes', memeRouter);
 app.use('/api/comments', commentRouter);
+app.use('/api/profile', profileRouter);
 
 // Error handler middleware
 app.use((err, req, res, next) => {

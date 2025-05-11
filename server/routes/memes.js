@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 const fs = require('fs');
@@ -109,7 +108,8 @@ router.post('/', auth, async (req, res) => {
       bottomText: bottomText || '',
       creator: {
         id: req.user.userId,
-        username: req.user.username
+        username: req.user.username,
+        avatar: req.user.avatar || ''
       },
       tags: tags ? tags.split(',').map(tag => tag.trim()) : [],
       fontSize: fontSize || 40,
@@ -242,6 +242,79 @@ router.post('/:id/vote', auth, async (req, res) => {
       downvotes: meme.downvotes,
       userVote: existingVote && existingVote.voteType === voteType ? null : voteType
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Flag inappropriate content
+router.post('/:id/flag', auth, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    
+    if (!reason) {
+      return res.status(400).json({ success: false, message: 'Please provide a reason for flagging this meme' });
+    }
+    
+    const meme = await Meme.findById(req.params.id);
+    
+    if (!meme) {
+      return res.status(404).json({ success: false, message: 'Meme not found' });
+    }
+    
+    // Check if user already flagged this meme
+    const alreadyFlagged = meme.flags.some(flag => flag.user.toString() === req.user.userId);
+    
+    if (alreadyFlagged) {
+      return res.status(400).json({ success: false, message: 'You have already flagged this meme' });
+    }
+    
+    // Add flag
+    meme.flags.push({
+      user: req.user.userId,
+      reason
+    });
+    
+    // Increment flag count
+    meme.flagCount += 1;
+    
+    // Auto mark as flagged if it reaches threshold (e.g., 5 flags)
+    if (meme.flagCount >= 5) {
+      meme.isFlagged = true;
+    }
+    
+    await meme.save();
+    
+    res.status(200).json({ 
+      success: true, 
+      message: 'Meme has been flagged successfully',
+      flagCount: meme.flagCount,
+      isFlagged: meme.isFlagged
+    });
+    
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Record view (increment view count)
+router.post('/:id/view', async (req, res) => {
+  try {
+    const meme = await Meme.findById(req.params.id);
+    
+    if (!meme) {
+      return res.status(404).json({ success: false, message: 'Meme not found' });
+    }
+    
+    // Increment view count
+    meme.views += 1;
+    await meme.save();
+    
+    res.status(200).json({
+      success: true,
+      views: meme.views
+    });
+    
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

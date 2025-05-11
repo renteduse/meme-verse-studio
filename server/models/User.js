@@ -29,6 +29,9 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  avatarCloudinaryId: {
+    type: String
+  },
   bio: {
     type: String,
     default: ''
@@ -36,6 +39,18 @@ const UserSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  },
+  // New fields
+  location: {
+    type: String,
+    default: ''
+  },
+  website: {
+    type: String,
+    default: ''
+  },
+  displayName: {
+    type: String
   }
 });
 

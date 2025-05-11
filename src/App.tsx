@@ -29,6 +29,7 @@ import Creators from "./pages/Creators";
 import Help from "./pages/Help";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
+import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="/meme/:id" element={<MemeDetail />} />
             <Route path="/dashboard" element={<UserDashboard />} />
             <Route path="/trending" element={<TrendingPage />} />
+            <Route path="/user/:userId" element={<Profile />} />
             
             {/* New Routes */}
             <Route path="/features" element={<Features />} />

@@ -75,6 +75,29 @@ const MemeSchema = new mongoose.Schema({
   fontColor: {
     type: String,
     default: '#FFFFFF'
+  },
+  // Added flag feature
+  flags: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    reason: {
+      type: String,
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  isFlagged: {
+    type: Boolean,
+    default: false
+  },
+  flagCount: {
+    type: Number,
+    default: 0
   }
 });
 
