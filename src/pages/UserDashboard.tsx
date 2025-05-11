@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import { useAuth } from "@/context/AuthContext";
@@ -11,15 +11,18 @@ import { Button } from "@/components/ui/button";
 import MemeCard from "@/components/meme/MemeCard";
 import MainLayout from "@/components/layout/MainLayout";
 import { toast } from "sonner";
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import axios from "axios";
 
 const UserDashboard = () => {
   const { user, isAuthenticated } = useAuth();
-  const { memes, loading, deleteMeme } = useMemes();
+  const { loading: globalLoading, deleteMeme, getUserMemes } = useMemes();
   const [userMemes, setUserMemes] = useState<Meme[]>([]);
+  const [draftMemes, setDraftMemes] = useState<Meme[]>([]);
   const [activeTab, setActiveTab] = useState("memes");
   const [memeToDelete, setMemeToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [loading, setLoading] = useState(true);
   
   // Redirect if not authenticated
   if (!isAuthenticated) {
@@ -27,11 +30,24 @@ const UserDashboard = () => {
   }
   
   useEffect(() => {
-    if (user && memes.length) {
-      const filteredMemes = memes.filter(meme => meme.creator.id === user.id);
-      setUserMemes(filteredMemes);
+    fetchUserMemes();
+  }, []);
+  
+  const fetchUserMemes = async () => {
+    setLoading(true);
+    try {
+      const memes = await getUserMemes();
+      const published = memes.filter(meme => !meme.isDraft);
+      const drafts = memes.filter(meme => meme.isDraft);
+      
+      setUserMemes(published);
+      setDraftMemes(drafts);
+    } catch (error) {
+      console.error('Error fetching user memes:', error);
+    } finally {
+      setLoading(false);
     }
-  }, [user, memes]);
+  };
   
   const handleDeleteMeme = async () => {
     if (!memeToDelete) return;
@@ -42,6 +58,7 @@ const UserDashboard = () => {
       const success = await deleteMeme(memeToDelete);
       if (success) {
         setUserMemes(prevMemes => prevMemes.filter(meme => meme.id !== memeToDelete));
+        setDraftMemes(prevMemes => prevMemes.filter(meme => meme.id !== memeToDelete));
         toast.success("Meme deleted successfully");
       }
     } catch (error) {
@@ -49,6 +66,25 @@ const UserDashboard = () => {
     } finally {
       setIsDeleting(false);
       setMemeToDelete(null);
+    }
+  };
+  
+  const handlePublishDraft = async (meme: Meme) => {
+    try {
+      const API_URL = 'http://localhost:5000/api';
+      const response = await axios.patch(`${API_URL}/memes/${meme.id}`, {
+        isDraft: 'false'
+      });
+      
+      if (response.data.success) {
+        // Move meme from drafts to published
+        setDraftMemes(prev => prev.filter(m => m.id !== meme.id));
+        setUserMemes(prev => [response.data.meme, ...prev]);
+        toast.success("Meme published successfully");
+      }
+    } catch (error) {
+      console.error('Error publishing draft:', error);
+      toast.error("Failed to publish draft");
     }
   };
   
@@ -87,7 +123,7 @@ const UserDashboard = () => {
               </p>
             </div>
             <Button asChild className="bg-gradient-to-r from-brand-purple to-brand-indigo">
-              <a href="/create">Create New Meme</a>
+              <Link to="/create">Create New Meme</Link>
             </Button>
           </div>
           
@@ -225,7 +261,7 @@ const UserDashboard = () => {
                   <div className="text-center py-8">
                     <p className="text-gray-500 mb-4">No memes created yet</p>
                     <Button asChild>
-                      <a href="/create">Create Your First Meme</a>
+                      <Link to="/create">Create Your First Meme</Link>
                     </Button>
                   </div>
                 )}
@@ -236,8 +272,8 @@ const UserDashboard = () => {
           {/* Meme Management Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-6">
-              <TabsTrigger value="memes">Your Memes</TabsTrigger>
-              <TabsTrigger value="drafts">Drafts</TabsTrigger>
+              <TabsTrigger value="memes">Published ({userMemes.length})</TabsTrigger>
+              <TabsTrigger value="drafts">Drafts ({draftMemes.length})</TabsTrigger>
               <TabsTrigger value="stats">Detailed Stats</TabsTrigger>
             </TabsList>
             
@@ -248,12 +284,12 @@ const UserDashboard = () => {
                 </div>
               ) : userMemes.length === 0 ? (
                 <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <h3 className="font-semibold mb-2">No Memes Yet</h3>
+                  <h3 className="font-semibold mb-2">No Published Memes Yet</h3>
                   <p className="text-gray-600 dark:text-gray-400 mb-4">
                     You haven't created any memes yet. Create your first one now!
                   </p>
                   <Button asChild>
-                    <a href="/create">Create Meme</a>
+                    <Link to="/create">Create Meme</Link>
                   </Button>
                 </div>
               ) : (
@@ -272,15 +308,72 @@ const UserDashboard = () => {
             </TabsContent>
             
             <TabsContent value="drafts">
-              <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <h3 className="font-semibold mb-2">No Drafts</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  You don't have any saved drafts. Start creating a new meme!
-                </p>
-                <Button asChild>
-                  <a href="/create">Create Meme</a>
-                </Button>
-              </div>
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                </div>
+              ) : draftMemes.length === 0 ? (
+                <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <h3 className="font-semibold mb-2">No Drafts</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    You don't have any saved drafts. Start creating a new meme!
+                  </p>
+                  <Button asChild>
+                    <Link to="/create">Create Meme</Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {draftMemes.map(draft => (
+                    <Card key={draft.id} className="overflow-hidden">
+                      <div className="p-4 border-b flex items-center justify-between">
+                        <h3 className="font-medium">Draft: {draft.topText || 'Untitled'}</h3>
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setMemeToDelete(draft.id)}
+                          >
+                            Delete
+                          </Button>
+                          <Button 
+                            variant="default" 
+                            size="sm"
+                            onClick={() => handlePublishDraft(draft)}
+                          >
+                            Publish
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="relative">
+                        <img
+                          src={draft.imageUrl}
+                          alt="Draft meme"
+                          className="w-full object-cover"
+                          style={{ maxHeight: "300px" }}
+                        />
+                        
+                        {draft.topText && (
+                          <div className="absolute top-2 left-0 right-0 text-center meme-text px-4 text-xl md:text-2xl">
+                            {draft.topText}
+                          </div>
+                        )}
+                        
+                        {draft.bottomText && (
+                          <div className="absolute bottom-2 left-0 right-0 text-center meme-text px-4 text-xl md:text-2xl">
+                            {draft.bottomText}
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-4">
+                        <p className="text-sm text-gray-500">
+                          Last edited: {format(new Date(draft.createdAt), "MMM d, yyyy • h:mm a")}
+                        </p>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </TabsContent>
             
             <TabsContent value="stats">

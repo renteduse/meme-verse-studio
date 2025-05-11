@@ -5,6 +5,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import axios from "axios";
+
+// Setup default axios config
+axios.defaults.baseURL = 'http://localhost:5000/api';
 
 // Pages
 import Landing from "./pages/Landing";

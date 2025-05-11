@@ -10,9 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import MemeCanvas from "@/components/meme/MemeCanvas";
 import MainLayout from "@/components/layout/MainLayout";
 import { toast } from "sonner";
+import { HexColorPicker } from "react-colorful";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 // Sample template images
 const templateImages = [
@@ -57,10 +60,14 @@ const MemeCreator = () => {
   const [topText, setTopText] = useState("");
   const [bottomText, setBottomText] = useState("");
   const [fontSize, setFontSize] = useState(40);
+  const [fontColor, setFontColor] = useState("#FFFFFF");
   const [tags, setTags] = useState<string[]>([]);
   const [currentTag, setCurrentTag] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedImage, setUploadedImage] = useState<File | null>(null);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveAsDraft, setSaveAsDraft] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -75,8 +82,9 @@ const MemeCreator = () => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
-        setUploadedImage(result);
+        setUploadedImageUrl(result);
         setImageUrl(result);
+        setUploadedImage(file);
       };
       reader.readAsDataURL(file);
     }
@@ -103,14 +111,25 @@ const MemeCreator = () => {
   const handleSelectTemplate = (templateUrl: string) => {
     setImageUrl(templateUrl);
     setUploadedImage(null);
+    setUploadedImageUrl(null);
   };
 
   const handleCanvasRendered = (canvas: HTMLCanvasElement) => {
     canvasRef.current = canvas;
   };
 
-  const handleCreateMeme = async () => {
-    if (!imageUrl) {
+  const handleSaveMeme = () => {
+    // Validate inputs
+    if (!imageUrl && !uploadedImage) {
+      toast.error("Please select or upload an image");
+      return;
+    }
+
+    setShowSaveDialog(true);
+  };
+
+  const handleCreateMeme = async (isDraft: boolean = false) => {
+    if (!imageUrl && !uploadedImage) {
       toast.error("Please select or upload an image");
       return;
     }
@@ -118,23 +137,39 @@ const MemeCreator = () => {
     setIsCreating(true);
 
     try {
-      if (user) {
-        const newMeme = await createMeme({
-          imageUrl,
-          topText,
-          bottomText,
-          userId: user.id,
-          username: user.username,
-          userAvatar: user.avatar,
-          tags
-        });
-        
+      // If using a template image from URL, we need to fetch it and convert to a File
+      let imageFile: File;
+      if (uploadedImage) {
+        imageFile = uploadedImage;
+      } else {
+        // Fetch the image from URL and convert to File
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        const fileName = imageUrl.split('/').pop() || 'template.jpg';
+        imageFile = new File([blob], fileName, { type: blob.type });
+      }
+
+      const newMeme = await createMeme({
+        imageFile,
+        topText,
+        bottomText,
+        tags,
+        fontSize,
+        fontColor,
+        isDraft
+      });
+      
+      if (!isDraft) {
         navigate(`/meme/${newMeme.id}`);
+      } else {
+        toast.success("Meme saved as draft");
+        navigate('/dashboard');
       }
     } catch (error) {
       console.error("Failed to create meme:", error);
     } finally {
       setIsCreating(false);
+      setShowSaveDialog(false);
     }
   };
 
@@ -165,6 +200,7 @@ const MemeCreator = () => {
                   topText={topText}
                   bottomText={bottomText}
                   fontSize={fontSize}
+                  fontColor={fontColor}
                   onImageRendered={handleCanvasRendered}
                 />
               </div>
@@ -190,7 +226,7 @@ const MemeCreator = () => {
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.98 }}
                           className={`relative cursor-pointer rounded-md overflow-hidden border-2 ${
-                            imageUrl === template.url && !uploadedImage
+                            imageUrl === template.url && !uploadedImageUrl
                               ? "border-primary"
                               : "border-transparent"
                           }`}
@@ -219,10 +255,10 @@ const MemeCreator = () => {
                         onChange={handleImageUpload}
                       />
                       
-                      {uploadedImage ? (
+                      {uploadedImageUrl ? (
                         <div className="space-y-3">
                           <img 
-                            src={uploadedImage} 
+                            src={uploadedImageUrl} 
                             alt="Uploaded preview"
                             className="max-h-40 mx-auto"
                           />
@@ -287,6 +323,27 @@ const MemeCreator = () => {
                       onValueChange={(values) => setFontSize(values[0])}
                     />
                   </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="font-color">Font Color</Label>
+                    <div className="flex items-center space-x-3">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="w-10 h-10 p-0 rounded-md"
+                            style={{ backgroundColor: fontColor }}
+                          >
+                            <span className="sr-only">Pick a color</span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-3">
+                          <HexColorPicker color={fontColor} onChange={setFontColor} />
+                        </PopoverContent>
+                      </Popover>
+                      <span>{fontColor}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
               
@@ -332,15 +389,43 @@ const MemeCreator = () => {
               <Button 
                 className="w-full bg-gradient-to-r from-brand-purple to-brand-indigo"
                 size="lg"
-                onClick={handleCreateMeme}
-                disabled={isCreating || !imageUrl}
+                onClick={handleSaveMeme}
+                disabled={isCreating || (!imageUrl && !uploadedImage)}
               >
-                {isCreating ? "Creating..." : "Create Meme"}
+                {isCreating ? "Creating..." : "Save Meme"}
               </Button>
             </div>
           </div>
         </motion.div>
       </div>
+
+      {/* Save Dialog */}
+      <AlertDialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save Your Meme</AlertDialogTitle>
+            <AlertDialogDescription>
+              Would you like to publish your meme now or save it as a draft?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCreating}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-gray-500 hover:bg-gray-600"
+              onClick={() => handleCreateMeme(true)}
+              disabled={isCreating}
+            >
+              Save as Draft
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => handleCreateMeme(false)}
+              disabled={isCreating}
+            >
+              Publish Now
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 };

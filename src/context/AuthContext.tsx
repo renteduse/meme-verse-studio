@@ -2,6 +2,10 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { toast } from "sonner";
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+
+// Define API URL
+const API_URL = 'http://localhost:5000/api';
 
 interface User {
   id: string;
@@ -29,35 +33,9 @@ export const useAuth = () => {
   return context;
 };
 
-// Mock API calls for demonstration purposes
-const mockLoginApi = async (email: string, password: string): Promise<User> => {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // This is where you'd normally make a POST request to your backend
-  if (email === 'demo@example.com' && password === 'password') {
-    return {
-      id: '1',
-      username: 'demouser',
-      email: 'demo@example.com',
-      avatar: 'https://i.pravatar.cc/150?img=32'
-    };
-  }
-  
-  throw new Error('Invalid credentials');
-};
-
-const mockRegisterApi = async (username: string, email: string, password: string): Promise<User> => {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // This is where you'd normally make a POST request to your backend
-  return {
-    id: '2',
-    username,
-    email,
-    avatar: 'https://i.pravatar.cc/150?img=33'
-  };
+// Setup axios instance with token
+const setupAxiosInterceptors = (token: string) => {
+  axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -66,24 +44,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for a saved user in localStorage
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+    // Check for a saved token in localStorage
+    const token = localStorage.getItem('token');
+    if (token) {
+      setupAxiosInterceptors(token);
+      fetchCurrentUser();
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/auth/me`);
+      if (response.data.success) {
+        setUser(response.data.user);
+      }
+    } catch (error) {
+      console.error('Error fetching user:', error);
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const userData = await mockLoginApi(email, password);
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      toast.success(`Welcome back, ${userData.username}!`);
-      navigate('/feed');
+      const response = await axios.post(`${API_URL}/auth/login`, { email, password });
+      
+      if (response.data.success) {
+        const { user, token } = response.data;
+        setUser(user);
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        setupAxiosInterceptors(token);
+        toast.success(`Welcome back, ${user.username}!`);
+        navigate('/feed');
+      }
     } catch (error: any) {
-      toast.error(error.message || 'Login failed');
+      const errorMessage = error.response?.data?.message || 'Login failed';
+      toast.error(errorMessage);
       throw error;
     } finally {
       setIsLoading(false);
@@ -93,13 +95,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (username: string, email: string, password: string) => {
     setIsLoading(true);
     try {
-      const userData = await mockRegisterApi(username, email, password);
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      toast.success('Registration successful! Welcome to ImageGenHub!');
-      navigate('/feed');
+      const response = await axios.post(`${API_URL}/auth/register`, { username, email, password });
+      
+      if (response.data.success) {
+        const { user, token } = response.data;
+        setUser(user);
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        setupAxiosInterceptors(token);
+        toast.success('Registration successful! Welcome to ImageGenHub!');
+        navigate('/feed');
+      }
     } catch (error: any) {
-      toast.error(error.message || 'Registration failed');
+      const errorMessage = error.response?.data?.message || 'Registration failed';
+      toast.error(errorMessage);
       throw error;
     } finally {
       setIsLoading(false);
@@ -108,7 +117,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem('token');
     localStorage.removeItem('user');
+    // Clear authorization header
+    delete axios.defaults.headers.common['Authorization'];
     toast.success('Logged out successfully');
     navigate('/');
   };

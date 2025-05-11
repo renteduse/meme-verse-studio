@@ -1,9 +1,15 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
+import axios from "axios";
+import { useAuth } from "@/context/AuthContext";
+
+// Define API URL
+const API_URL = 'http://localhost:5000/api';
 
 export interface Meme {
   id: string;
+  _id: string;
   imageUrl: string;
   topText: string;
   bottomText: string;
@@ -19,220 +25,246 @@ export interface Meme {
   commentCount: number;
   views: number;
   tags: string[];
+  fontSize?: number;
+  fontColor?: string;
+  isDraft?: boolean;
 }
 
-// Mock data
-const MOCK_MEMES: Meme[] = [
-  {
-    id: "1",
-    imageUrl: "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b",
-    topText: "WHEN YOUR CODE WORKS",
-    bottomText: "BUT YOU DON'T KNOW WHY",
-    creator: {
-      id: "user1",
-      username: "debuggod",
-      avatar: "https://i.pravatar.cc/150?img=1"
-    },
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    upvotes: 423,
-    downvotes: 21,
-    commentCount: 18,
-    views: 1247,
-    tags: ["javascript", "programming"]
-  },
-  {
-    id: "2",
-    imageUrl: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6",
-    topText: "THAT MOMENT",
-    bottomText: "WHEN THE BUG FIXES ITSELF",
-    creator: {
-      id: "user2",
-      username: "codewizard",
-      avatar: "https://i.pravatar.cc/150?img=2"
-    },
-    createdAt: new Date(Date.now() - 172800000).toISOString(),
-    upvotes: 331,
-    downvotes: 12,
-    commentCount: 24,
-    views: 982,
-    tags: ["bug", "webdev"]
-  },
-  {
-    id: "3",
-    imageUrl: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5",
-    topText: "DEBUGGING",
-    bottomText: "THE MATRIX",
-    creator: {
-      id: "user3",
-      username: "hackerx",
-      avatar: "https://i.pravatar.cc/150?img=3"
-    },
-    createdAt: new Date(Date.now() - 259200000).toISOString(),
-    upvotes: 512,
-    downvotes: 34,
-    commentCount: 32,
-    views: 1568,
-    tags: ["matrix", "debugging"]
-  },
-  {
-    id: "4",
-    imageUrl: "https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7",
-    topText: "INDENT YOUR CODE",
-    bottomText: "OR REGRET IT LATER",
-    creator: {
-      id: "user4",
-      username: "syntaxerror",
-      avatar: "https://i.pravatar.cc/150?img=4"
-    },
-    createdAt: new Date(Date.now() - 345600000).toISOString(),
-    upvotes: 267,
-    downvotes: 18,
-    commentCount: 12,
-    views: 723,
-    tags: ["syntax", "bestpractices"]
-  },
-  {
-    id: "5",
-    imageUrl: "https://images.unsplash.com/photo-1498050108023-c5249f4df085",
-    topText: "WRITING CLEAN CODE",
-    bottomText: "VS MAKING IT WORK",
-    creator: {
-      id: "user5",
-      username: "codecrafter",
-      avatar: "https://i.pravatar.cc/150?img=5"
-    },
-    createdAt: new Date(Date.now() - 432000000).toISOString(),
-    upvotes: 185,
-    downvotes: 9,
-    commentCount: 8,
-    views: 562,
-    tags: ["cleancode", "coding"]
-  }
-];
+interface FetchMemesOptions {
+  page?: number;
+  limit?: number;
+  sort?: 'new' | 'top';
+  time?: 'all' | '24h' | 'week';
+}
 
 export const useMemes = () => {
   const [memes, setMemes] = useState<Meme[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated, user } = useAuth();
+  
+  // Format meme from API response
+  const formatMeme = (meme: any): Meme => ({
+    id: meme._id,
+    _id: meme._id,
+    imageUrl: meme.imageUrl.startsWith('http') ? meme.imageUrl : `${API_URL}${meme.imageUrl}`,
+    topText: meme.topText || '',
+    bottomText: meme.bottomText || '',
+    creator: {
+      id: meme.creator.id,
+      username: meme.creator.username,
+      avatar: meme.creator.avatar
+    },
+    createdAt: meme.createdAt,
+    upvotes: meme.upvotes,
+    downvotes: meme.downvotes,
+    userVote: meme.userVote,
+    commentCount: meme.commentCount,
+    views: meme.views,
+    tags: meme.tags,
+    fontSize: meme.fontSize,
+    fontColor: meme.fontColor,
+    isDraft: meme.isDraft
+  });
+
+  const fetchMemes = async (options: FetchMemesOptions = {}) => {
+    const { page = 1, limit = 10, sort = 'new', time = 'all' } = options;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await axios.get(`${API_URL}/memes`, {
+        params: { page, limit, sort, time }
+      });
+      
+      if (response.data.success) {
+        const formattedMemes = response.data.memes.map(formatMeme);
+        setMemes(formattedMemes);
+      }
+    } catch (err) {
+      console.error('Error fetching memes:', err);
+      setError("Failed to load memes");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Simulate API call to fetch memes
-    const fetchMemes = async () => {
-      try {
-        // In a real app, this would be an API call
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setMemes(MOCK_MEMES);
-        setLoading(false);
-      } catch (err) {
-        setError("Failed to load memes");
-        setLoading(false);
-      }
-    };
-
     fetchMemes();
   }, []);
 
-  const getMemeById = (id: string): Meme | undefined => {
-    return memes.find(meme => meme.id === id);
-  };
+  const getMemeById = useCallback(async (id: string): Promise<Meme | undefined> => {
+    try {
+      const response = await axios.get(`${API_URL}/memes/${id}`);
+      
+      if (response.data.success) {
+        return formatMeme(response.data.meme);
+      }
+      return undefined;
+    } catch (err) {
+      console.error('Error fetching meme:', err);
+      throw new Error("Failed to fetch meme");
+    }
+  }, []);
 
   const createMeme = async (memeData: { 
-    imageUrl: string; 
+    imageFile: File;
     topText: string; 
-    bottomText: string; 
-    userId: string;
-    username: string;
-    userAvatar?: string;
+    bottomText: string;
     tags: string[];
-  }) => {
-    try {
-      // Simulate API call to create a meme
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      const newMeme: Meme = {
-        id: Date.now().toString(),
-        imageUrl: memeData.imageUrl,
-        topText: memeData.topText,
-        bottomText: memeData.bottomText,
-        creator: {
-          id: memeData.userId,
-          username: memeData.username,
-          avatar: memeData.userAvatar
-        },
-        createdAt: new Date().toISOString(),
-        upvotes: 0,
-        downvotes: 0,
-        commentCount: 0,
-        views: 0,
-        tags: memeData.tags
-      };
+    fontSize?: number;
+    fontColor?: string;
+    isDraft?: boolean;
+  }): Promise<Meme> => {
+    if (!isAuthenticated) {
+      throw new Error('You must be logged in to create a meme');
+    }
 
-      setMemes(prevMemes => [newMeme, ...prevMemes]);
-      toast.success("Meme created successfully!");
-      return newMeme;
-    } catch (err) {
-      toast.error("Failed to create meme");
+    try {
+      const formData = new FormData();
+      formData.append('image', memeData.imageFile);
+      formData.append('topText', memeData.topText);
+      formData.append('bottomText', memeData.bottomText);
+      formData.append('tags', memeData.tags.join(','));
+      
+      if (memeData.fontSize) {
+        formData.append('fontSize', memeData.fontSize.toString());
+      }
+      
+      if (memeData.fontColor) {
+        formData.append('fontColor', memeData.fontColor);
+      }
+      
+      if (memeData.isDraft !== undefined) {
+        formData.append('isDraft', memeData.isDraft.toString());
+      }
+      
+      const response = await axios.post(`${API_URL}/memes`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      if (response.data.success) {
+        const newMeme = formatMeme(response.data.meme);
+        setMemes(prevMemes => [newMeme, ...prevMemes]);
+        toast.success("Meme created successfully!");
+        return newMeme;
+      }
+      
       throw new Error("Failed to create meme");
+    } catch (err: any) {
+      console.error('Error creating meme:', err);
+      toast.error(err.response?.data?.message || "Failed to create meme");
+      throw new Error(err.response?.data?.message || "Failed to create meme");
+    }
+  };
+
+  const updateMeme = async (memeId: string, updateData: {
+    topText?: string;
+    bottomText?: string;
+    tags?: string[];
+    fontSize?: number;
+    fontColor?: string;
+    isDraft?: boolean;
+  }): Promise<Meme> => {
+    try {
+      const response = await axios.patch(`${API_URL}/memes/${memeId}`, updateData);
+      
+      if (response.data.success) {
+        const updatedMeme = formatMeme(response.data.meme);
+        
+        setMemes(prevMemes => 
+          prevMemes.map(meme => 
+            meme.id === memeId ? updatedMeme : meme
+          )
+        );
+        
+        toast.success("Meme updated successfully");
+        return updatedMeme;
+      }
+      
+      throw new Error("Failed to update meme");
+    } catch (err: any) {
+      console.error('Error updating meme:', err);
+      toast.error(err.response?.data?.message || "Failed to update meme");
+      throw new Error(err.response?.data?.message || "Failed to update meme");
     }
   };
 
   const voteMeme = async (memeId: string, voteType: "up" | "down" | null) => {
+    if (!isAuthenticated) {
+      toast.error("You must be logged in to vote");
+      return false;
+    }
+
     try {
-      // Simulate API call to vote on a meme
-      await new Promise(resolve => setTimeout(resolve, 300));
+      const response = await axios.post(`${API_URL}/memes/${memeId}/vote`, { voteType });
       
-      setMemes(prevMemes => 
-        prevMemes.map(meme => {
-          if (meme.id === memeId) {
-            const previousVote = meme.userVote;
-            
-            // Calculate new vote counts
-            let newUpvotes = meme.upvotes;
-            let newDownvotes = meme.downvotes;
-            
-            // Remove previous vote if it exists
-            if (previousVote === "up") {
-              newUpvotes -= 1;
-            } else if (previousVote === "down") {
-              newDownvotes -= 1;
+      if (response.data.success) {
+        // Update meme in state with new vote counts
+        setMemes(prevMemes => 
+          prevMemes.map(meme => {
+            if (meme.id === memeId) {
+              return {
+                ...meme,
+                upvotes: response.data.upvotes,
+                downvotes: response.data.downvotes,
+                userVote: response.data.userVote
+              };
             }
-            
-            // Add new vote
-            if (voteType === "up") {
-              newUpvotes += 1;
-            } else if (voteType === "down") {
-              newDownvotes += 1;
-            }
-            
-            return {
-              ...meme,
-              upvotes: newUpvotes,
-              downvotes: newDownvotes,
-              userVote: voteType
-            };
-          }
-          return meme;
-        })
-      );
+            return meme;
+          })
+        );
+        
+        return true;
+      }
       
-      return true;
+      return false;
     } catch (err) {
-      toast.error("Failed to vote on meme");
+      console.error('Error voting:', err);
+      toast.error("Failed to register vote");
       return false;
     }
   };
 
   const deleteMeme = async (memeId: string) => {
     try {
-      // Simulate API call to delete a meme
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await axios.delete(`${API_URL}/memes/${memeId}`);
       
-      setMemes(prevMemes => prevMemes.filter(meme => meme.id !== memeId));
-      toast.success("Meme deleted successfully");
-      return true;
+      if (response.data.success) {
+        // Remove meme from state
+        setMemes(prevMemes => prevMemes.filter(meme => meme.id !== memeId));
+        toast.success("Meme deleted successfully");
+        return true;
+      }
+      
+      return false;
     } catch (err) {
+      console.error('Error deleting meme:', err);
       toast.error("Failed to delete meme");
       return false;
+    }
+  };
+
+  const getUserMemes = async () => {
+    if (!isAuthenticated) {
+      return [];
+    }
+    
+    try {
+      const response = await axios.get(`${API_URL}/memes/user/mymemes`);
+      
+      if (response.data.success) {
+        return response.data.memes.map(formatMeme);
+      }
+      
+      return [];
+    } catch (err) {
+      console.error('Error fetching user memes:', err);
+      toast.error("Failed to load your memes");
+      return [];
     }
   };
 
@@ -240,9 +272,12 @@ export const useMemes = () => {
     memes,
     loading,
     error,
+    fetchMemes,
     getMemeById,
     createMeme,
+    updateMeme,
     voteMeme,
     deleteMeme,
+    getUserMemes
   };
 };
