@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -171,17 +171,27 @@ const UserProfile = () => {
             <CardContent>
               <div className="flex flex-col md:flex-row items-center gap-6">
                 <div className="relative">
-                  {avatarPreview ? (
-                    <img 
-                      src={avatarPreview} 
-                      alt="Avatar Preview" 
-                      className="w-32 h-32 rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-lg"
-                    />
-                  ) : (
-                    <div className="w-32 h-32 rounded-full bg-gradient-to-br from-purple-400 to-indigo-600 flex items-center justify-center text-white text-4xl font-bold border-4 border-white dark:border-gray-800 shadow-lg">
-                      {user?.username.substring(0, 2).toUpperCase()}
-                    </div>
-                  )}
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={avatarPreview || "default"}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {avatarPreview ? (
+                        <img 
+                          src={avatarPreview} 
+                          alt="Avatar Preview" 
+                          className="w-32 h-32 rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-lg"
+                        />
+                      ) : (
+                        <div className="w-32 h-32 rounded-full bg-gradient-to-br from-purple-400 to-indigo-600 flex items-center justify-center text-white text-4xl font-bold border-4 border-white dark:border-gray-800 shadow-lg">
+                          {user?.username.substring(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
                 </div>
                 
                 <div className="space-y-4 flex-1">
@@ -202,7 +212,7 @@ const UserProfile = () => {
                     <Button 
                       onClick={handleUploadAvatar}
                       disabled={isUploadingAvatar}
-                      className="w-full md:w-auto"
+                      className="w-full md:w-auto hover:scale-105 transition-all"
                     >
                       {isUploadingAvatar ? (
                         <>
@@ -243,6 +253,7 @@ const UserProfile = () => {
                           value={formValues.displayName}
                           onChange={handleInputChange}
                           placeholder="Display Name"
+                          className="hover:border-primary transition-colors"
                         />
                       </div>
                     </div>
@@ -256,6 +267,7 @@ const UserProfile = () => {
                         onChange={handleInputChange}
                         placeholder="Write a short bio about yourself"
                         rows={4}
+                        className="hover:border-primary transition-colors"
                       />
                     </div>
                     
@@ -269,6 +281,7 @@ const UserProfile = () => {
                           value={formValues.location}
                           onChange={handleInputChange}
                           placeholder="City, Country"
+                          className="hover:border-primary transition-colors"
                         />
                       </div>
                     </div>
@@ -283,6 +296,7 @@ const UserProfile = () => {
                           value={formValues.website}
                           onChange={handleInputChange}
                           placeholder="https://yourwebsite.com"
+                          className="hover:border-primary transition-colors"
                         />
                       </div>
                     </div>
@@ -294,26 +308,30 @@ const UserProfile = () => {
                     type="button"
                     variant="outline"
                     onClick={() => navigate('/dashboard')}
+                    className="hover:scale-105 transition-all"
                   >
                     Back to Dashboard
                   </Button>
                   
-                  <Button 
-                    type="submit"
-                    disabled={isSaving}
-                  >
-                    {isSaving ? (
-                      <>
-                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-r-transparent" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save Changes
-                      </>
-                    )}
-                  </Button>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button 
+                      type="submit"
+                      disabled={isSaving}
+                      className="bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600"
+                    >
+                      {isSaving ? (
+                        <>
+                          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-r-transparent" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" />
+                          Save Changes
+                        </>
+                      )}
+                    </Button>
+                  </motion.div>
                 </div>
               </form>
             </CardContent>

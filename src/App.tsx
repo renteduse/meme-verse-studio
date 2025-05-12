@@ -1,18 +1,18 @@
 
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-import Home from "@/pages/Home";
-import Feed from "@/pages/Feed";
-import Register from "@/pages/auth/Register";
-import Login from "@/pages/auth/Login";
-import UserDashboard from "@/pages/UserDashboard";
-import MemeDetail from "@/pages/MemeDetail";
-import MemeCreator from "@/pages/MemeCreator";
-import EditMeme from "@/pages/EditMeme";
-import Profile from "@/pages/Profile";
-import UserProfile from "@/pages/UserProfile";
-import { ThemeProvider } from "@/providers/theme-provider";
+import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/context/AuthContext";
+import Home from "./pages/Home";
+import Feed from "./pages/Feed";
+import Register from "./pages/Register";
+import Login from "./pages/Login";
+import UserDashboard from "./pages/UserDashboard";
+import MemeDetail from "./pages/MemeDetail";
+import MemeCreator from "./pages/MemeCreator";
+import EditMeme from "./pages/EditMeme";
+import Profile from "./pages/Profile";
+import UserProfile from "./pages/UserProfile";
 
 function App() {
   return (

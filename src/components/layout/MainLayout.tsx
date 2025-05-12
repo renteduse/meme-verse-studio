@@ -19,8 +19,8 @@ const MainLayout = ({
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
-      {/* Added margin-top (mt-6) below the navbar */}
-      <main className={`flex-grow mt-6 ${className}`}>{children}</main>
+      {/* Added margin-top (mt-16) below the navbar for better spacing */}
+      <main className={`flex-grow mt-16 ${className}`}>{children}</main>
       {!hideFooter && (
         <>
           {footerPadding && <div className="py-8" />}  {/* Spacing before footer if enabled */}

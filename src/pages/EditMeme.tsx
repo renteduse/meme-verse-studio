@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
@@ -84,7 +83,7 @@ const EditMeme = () => {
     }
   };
   
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormValues({
       ...formValues,
@@ -220,7 +219,8 @@ const EditMeme = () => {
                           className="absolute top-2 left-0 right-0 text-center px-4"
                           style={{ 
                             fontSize: `${formValues.fontSize}px`,
-                            color: formValues.fontColor
+                            color: formValues.fontColor,
+                            textShadow: '2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000'
                           }}
                         >
                           {formValues.topText}
@@ -232,7 +232,8 @@ const EditMeme = () => {
                           className="absolute bottom-2 left-0 right-0 text-center px-4"
                           style={{ 
                             fontSize: `${formValues.fontSize}px`,
-                            color: formValues.fontColor
+                            color: formValues.fontColor,
+                            textShadow: '2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000'
                           }}
                         >
                           {formValues.bottomText}
@@ -252,6 +253,7 @@ const EditMeme = () => {
                         onChange={handleInputChange}
                         placeholder="Enter top text"
                         maxLength={100}
+                        className="transition-all hover:border-primary focus:border-primary"
                       />
                     </div>
                     
@@ -264,6 +266,7 @@ const EditMeme = () => {
                         onChange={handleInputChange}
                         placeholder="Enter bottom text"
                         maxLength={100}
+                        className="transition-all hover:border-primary focus:border-primary"
                       />
                     </div>
                     
@@ -318,14 +321,17 @@ const EditMeme = () => {
                             }
                           }}
                         />
-                        <Button type="button" onClick={handleAddTag}>Add</Button>
+                        <motion.div whileTap={{ scale: 0.95 }}>
+                          <Button type="button" onClick={handleAddTag}>Add</Button>
+                        </motion.div>
                       </div>
                       
                       {formValues.tags.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-2">
                           {formValues.tags.map((tag) => (
-                            <div 
-                              key={tag} 
+                            <motion.div
+                              key={tag}
+                              whileHover={{ scale: 1.05 }} 
                               className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm flex items-center gap-1"
                             >
                               #{tag}
@@ -336,7 +342,7 @@ const EditMeme = () => {
                               >
                                 ×
                               </button>
-                            </div>
+                            </motion.div>
                           ))}
                         </div>
                       )}
@@ -354,41 +360,46 @@ const EditMeme = () => {
                 </div>
                 
                 <div className="flex justify-between pt-4 border-t">
-                  <Button 
-                    type="button" 
-                    variant="destructive"
-                    onClick={handleDelete}
-                    disabled={isDeleting || isSaving}
-                  >
-                    {isDeleting ? (
-                      <>
-                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-r-transparent" />
-                        Deleting...
-                      </>
-                    ) : (
-                      <>
-                        <Trash className="mr-2 h-4 w-4" />
-                        Delete Meme
-                      </>
-                    )}
-                  </Button>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button 
+                      type="button" 
+                      variant="destructive"
+                      onClick={handleDelete}
+                      disabled={isDeleting || isSaving}
+                    >
+                      {isDeleting ? (
+                        <>
+                          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-r-transparent" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash className="mr-2 h-4 w-4" />
+                          Delete Meme
+                        </>
+                      )}
+                    </Button>
+                  </motion.div>
                   
-                  <Button 
-                    type="submit"
-                    disabled={isSaving || isDeleting}
-                  >
-                    {isSaving ? (
-                      <>
-                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-r-transparent" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save Changes
-                      </>
-                    )}
-                  </Button>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button 
+                      type="submit"
+                      disabled={isSaving || isDeleting}
+                      className="bg-gradient-to-r from-purple-600 to-blue-500"
+                    >
+                      {isSaving ? (
+                        <>
+                          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-r-transparent" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" />
+                          Save Changes
+                        </>
+                      )}
+                    </Button>
+                  </motion.div>
                 </div>
               </form>
             </CardContent>
