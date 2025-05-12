@@ -4,7 +4,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import { useAuth } from "@/context/AuthContext";
-import { useMemes, Meme } from "@/hooks/useMemes";
+import { useMemes, Meme, Comment } from "@/hooks/useMemes";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,30 +14,25 @@ import { Separator } from "@/components/ui/separator";
 import MainLayout from "@/components/layout/MainLayout";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
-
-interface Comment {
-  id: string;
-  text: string;
-  createdAt: string;
-  user: {
-    id: string;
-    username: string;
-    avatar?: string;
-  };
-}
+import { ThumbsUp, ThumbsDown, Flag, MessageSquare, Eye, Trash2 } from "lucide-react";
 
 const MemeDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const { memes, loading, error, voteMeme, deleteMeme } = useMemes();
+  const { getMemeById, voteMeme, deleteMeme, getComments, addComment, deleteComment } = useMemes();
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   
   const [meme, setMeme] = useState<Meme | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [totalComments, setTotalComments] = useState(0);
+  const [commentPage, setCommentPage] = useState(1);
+  const [hasMoreComments, setHasMoreComments] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [isDeletingComment, setIsDeletingComment] = useState<string | null>(null);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [currentVotes, setCurrentVotes] = useState({
     upvotes: 0,
     downvotes: 0,
@@ -45,69 +40,56 @@ const MemeDetail = () => {
   });
   
   useEffect(() => {
-    if (memes.length && id) {
-      const foundMeme = memes.find(m => m.id === id);
-      if (foundMeme) {
-        setMeme(foundMeme);
-        setCurrentVotes({
-          upvotes: foundMeme.upvotes,
-          downvotes: foundMeme.downvotes,
-          userVote: foundMeme.userVote
-        });
-        
-        // Generate mock comments
-        generateMockComments(foundMeme);
-      }
+    if (id) {
+      fetchMeme();
     }
-  }, [memes, id]);
+  }, [id]);
   
-  const generateMockComments = (meme: Meme) => {
-    const mockComments: Comment[] = [];
+  const fetchMeme = async () => {
+    if (!id) return;
     
-    const commentTexts = [
-      "This is hilarious! 😂",
-      "I feel personally attacked by this meme",
-      "As a developer, I can confirm this is 100% accurate",
-      "Send this to your non-technical friends and watch their confusion",
-      "I'm in this picture and I don't like it",
-      "This is the story of my life!",
-      "Saving this one for later 📌",
-      "My daily struggle",
-      "This deserves more upvotes",
-      "Quality content right here"
-    ];
-    
-    const usernames = [
-      "codewizard",
-      "debuggod",
-      "stackoverflowner",
-      "gitcommit",
-      "semicolonfighter",
-      "jsmaster",
-      "cssmagician",
-      "reactninja",
-      "pythonista",
-      "devops_guru"
-    ];
-    
-    for (let i = 0; i < Math.min(meme.commentCount, 5); i++) {
-      mockComments.push({
-        id: `comment-${i}-${meme.id}`,
-        text: commentTexts[Math.floor(Math.random() * commentTexts.length)],
-        createdAt: new Date(Date.now() - Math.floor(Math.random() * 86400000 * 7)).toISOString(),
-        user: {
-          id: `user-${i}`,
-          username: usernames[Math.floor(Math.random() * usernames.length)],
-          avatar: `https://i.pravatar.cc/150?img=${i + 10}`
-        }
-      });
+    setLoading(true);
+    try {
+      const memeData = await getMemeById(id);
+      if (memeData) {
+        setMeme(memeData);
+        setCurrentVotes({
+          upvotes: memeData.upvotes,
+          downvotes: memeData.downvotes,
+          userVote: memeData.userVote
+        });
+        fetchComments();
+      }
+    } catch (error) {
+      console.error('Error fetching meme:', error);
+      toast.error("Failed to load meme");
+    } finally {
+      setLoading(false);
     }
-    
-    // Sort by newest first
-    mockComments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    
-    setComments(mockComments);
   };
+  
+  const fetchComments = async () => {
+    if (!id) return;
+    
+    try {
+      const result = await getComments(id, { page: commentPage });
+      setComments(prev => commentPage === 1 ? result.comments : [...prev, ...result.comments]);
+      setTotalComments(result.total);
+      setHasMoreComments(commentPage < result.pages);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+    }
+  };
+  
+  const loadMoreComments = () => {
+    setCommentPage(prev => prev + 1);
+  };
+  
+  useEffect(() => {
+    if (id && commentPage > 1) {
+      fetchComments();
+    }
+  }, [commentPage]);
   
   const handleVote = async (voteType: "up" | "down" | null) => {
     if (!isAuthenticated) {
@@ -168,6 +150,8 @@ const MemeDetail = () => {
       return;
     }
     
+    if (!meme) return;
+    
     if (!newComment.trim()) {
       toast.error("Comment cannot be empty");
       return;
@@ -181,31 +165,17 @@ const MemeDetail = () => {
     setIsSubmittingComment(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const comment = await addComment(meme.id, newComment);
       
-      if (user && meme) {
-        const newCommentObj: Comment = {
-          id: `comment-new-${Date.now()}`,
-          text: newComment,
-          createdAt: new Date().toISOString(),
-          user: {
-            id: user.id,
-            username: user.username,
-            avatar: user.avatar
-          }
-        };
-        
-        // Update comments
-        setComments([newCommentObj, ...comments]);
+      if (comment) {
+        setComments([comment, ...comments]);
+        setTotalComments(prev => prev + 1);
         
         // Update meme comment count
-        if (meme) {
-          setMeme({
-            ...meme,
-            commentCount: meme.commentCount + 1
-          });
-        }
+        setMeme({
+          ...meme,
+          commentCount: meme.commentCount + 1
+        });
         
         setNewComment("");
         toast.success("Comment added");
@@ -214,6 +184,26 @@ const MemeDetail = () => {
       toast.error("Failed to add comment");
     } finally {
       setIsSubmittingComment(false);
+    }
+  };
+  
+  const handleDeleteComment = async (commentId: string) => {
+    if (!meme) return;
+    
+    setIsDeletingComment(commentId);
+    
+    try {
+      const success = await deleteComment(commentId, meme.id);
+      
+      if (success) {
+        setComments(comments.filter(c => c.id !== commentId));
+        setTotalComments(prev => prev - 1);
+        toast.success("Comment deleted");
+      }
+    } catch (error) {
+      toast.error("Failed to delete comment");
+    } finally {
+      setIsDeletingComment(null);
     }
   };
   
@@ -253,7 +243,7 @@ const MemeDetail = () => {
     );
   }
   
-  if (error || !meme) {
+  if (!meme) {
     return (
       <MainLayout>
         <div className="container max-w-4xl px-4 py-20">
@@ -299,6 +289,13 @@ const MemeDetail = () => {
           
           {/* Meme Card */}
           <Card className="overflow-hidden shadow-lg">
+            {/* Flag Banner */}
+            {meme.isFlagged && (
+              <div className="bg-red-500 text-white px-4 py-1 text-center text-sm font-medium">
+                This meme has been flagged by the community
+              </div>
+            )}
+            
             <CardContent className="p-0">
               {/* Creator Info */}
               <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
@@ -347,13 +344,25 @@ const MemeDetail = () => {
                 
                 {/* Meme text overlay */}
                 {meme.topText && (
-                  <div className="absolute top-4 left-0 right-0 text-center meme-text px-4 text-2xl md:text-4xl">
+                  <div 
+                    className="absolute top-4 left-0 right-0 text-center meme-text px-4 text-2xl md:text-4xl"
+                    style={{ 
+                      fontSize: `${meme.fontSize || 40}px`,
+                      color: meme.fontColor || '#FFFFFF'
+                    }}
+                  >
                     {meme.topText}
                   </div>
                 )}
                 
                 {meme.bottomText && (
-                  <div className="absolute bottom-4 left-0 right-0 text-center meme-text px-4 text-2xl md:text-4xl">
+                  <div 
+                    className="absolute bottom-4 left-0 right-0 text-center meme-text px-4 text-2xl md:text-4xl"
+                    style={{ 
+                      fontSize: `${meme.fontSize || 40}px`,
+                      color: meme.fontColor || '#FFFFFF'
+                    }}
+                  >
                     {meme.bottomText}
                   </div>
                 )}
@@ -366,53 +375,34 @@ const MemeDetail = () => {
                 {/* Voting & Stats */}
                 <div className="flex items-center justify-between">
                   {/* Vote buttons */}
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-2">
                     <Button
                       variant="ghost"
                       size="sm"
-                      className={`text-gray-500 hover:text-green-500 ${
-                        currentVotes.userVote === "up" ? "text-green-500" : ""
+                      className={`group relative ${
+                        currentVotes.userVote === "up" ? "text-green-500" : "text-gray-500 hover:text-green-500" 
                       }`}
                       onClick={() => handleVote("up")}
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5 mr-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 15l7-7 7 7"
-                        />
-                      </svg>
+                      <ThumbsUp 
+                        className={`mr-1 ${currentVotes.userVote === "up" ? "fill-green-500 stroke-green-500" : "group-hover:stroke-green-500"}`} 
+                        size={20}
+                      />
                       <span>{currentVotes.upvotes}</span>
                     </Button>
+                    
                     <Button
                       variant="ghost"
                       size="sm"
-                      className={`text-gray-500 hover:text-red-500 ${
-                        currentVotes.userVote === "down" ? "text-red-500" : ""
+                      className={`group relative ${
+                        currentVotes.userVote === "down" ? "text-red-500" : "text-gray-500 hover:text-red-500"
                       }`}
                       onClick={() => handleVote("down")}
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5 mr-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
+                      <ThumbsDown 
+                        className={`mr-1 ${currentVotes.userVote === "down" ? "fill-red-500 stroke-red-500" : "group-hover:stroke-red-500"}`} 
+                        size={20}
+                      />
                       <span>{currentVotes.downvotes}</span>
                     </Button>
                   </div>
@@ -420,42 +410,11 @@ const MemeDetail = () => {
                   {/* Stats */}
                   <div className="flex items-center space-x-4 text-gray-500 dark:text-gray-400">
                     <div className="flex items-center text-sm">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4 mr-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                        />
-                      </svg>
+                      <MessageSquare size={18} className="mr-1" />
                       <span>{meme.commentCount}</span>
                     </div>
                     <div className="flex items-center text-sm">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4 mr-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                        />
-                      </svg>
+                      <Eye size={18} className="mr-1" />
                       <span>{meme.views}</span>
                     </div>
                   </div>
@@ -525,13 +484,31 @@ const MemeDetail = () => {
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
-                      <div className="flex items-center">
-                        <Link to={`/user/${comment.user.id}`} className="font-medium text-sm mr-2 hover:underline">
-                          {comment.user.username}
-                        </Link>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {formatDate(comment.createdAt)}
-                        </span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <Link to={`/user/${comment.user.id}`} className="font-medium text-sm mr-2 hover:underline">
+                            {comment.user.username}
+                          </Link>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {formatDate(comment.createdAt)}
+                          </span>
+                        </div>
+                        
+                        {isAuthenticated && user?.id === comment.user.id && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-gray-500 hover:text-red-500"
+                            onClick={() => handleDeleteComment(comment.id)}
+                            disabled={isDeletingComment === comment.id}
+                          >
+                            {isDeletingComment === comment.id ? (
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            ) : (
+                              <Trash2 size={16} />
+                            )}
+                          </Button>
+                        )}
                       </div>
                       <p className="mt-1">{comment.text}</p>
                     </div>
@@ -540,6 +517,17 @@ const MemeDetail = () => {
               ) : (
                 <div className="text-center py-8">
                   <p className="text-gray-500">No comments yet. Be the first to comment!</p>
+                </div>
+              )}
+              
+              {hasMoreComments && (
+                <div className="text-center pt-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={loadMoreComments}
+                  >
+                    Load More Comments
+                  </Button>
                 </div>
               )}
             </div>

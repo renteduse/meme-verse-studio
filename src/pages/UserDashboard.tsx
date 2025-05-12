@@ -12,6 +12,7 @@ import MemeCard from "@/components/meme/MemeCard";
 import MainLayout from "@/components/layout/MainLayout";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { Edit, PenTool } from "lucide-react";
 import axios from "axios";
 
 const UserDashboard = () => {
@@ -159,45 +160,61 @@ const UserDashboard = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Profile Info */}
             <Card className="lg:col-span-1">
-              <CardHeader>
-                <CardTitle>Profile</CardTitle>
-                <CardDescription>Your account details</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Profile</CardTitle>
+                  <CardDescription>Your account details</CardDescription>
+                </div>
+                <Button variant="ghost" size="icon" asChild>
+                  <Link to="/profile">
+                    <Edit className="h-4 w-4" />
+                  </Link>
+                </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex flex-col items-center">
-                  <div className="relative">
+                  <Link to="/profile" className="relative">
                     {user?.avatar ? (
                       <img 
                         src={user.avatar} 
                         alt={user.username}
-                        className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-gray-800"
+                        className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-gray-800 hover:opacity-90 transition-opacity"
                       />
                     ) : (
-                      <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xl font-bold">
+                      <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xl font-bold hover:bg-primary/30 transition-colors">
                         {user?.username.substring(0, 2).toUpperCase()}
                       </div>
                     )}
                     <span className="absolute bottom-0 right-0 w-6 h-6 bg-green-500 border-4 border-white dark:border-gray-800 rounded-full"></span>
-                  </div>
+                  </Link>
                   
                   <div className="mt-4 text-center">
-                    <h2 className="text-xl font-bold">{user?.username}</h2>
+                    <h2 className="text-xl font-bold">{user?.displayName || user?.username}</h2>
                     <p className="text-gray-600 dark:text-gray-400">{user?.email}</p>
                   </div>
                 </div>
                 
                 <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                  {user?.bio && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {user.bio}
+                    </p>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600 dark:text-gray-400">Member since</span>
                     <span className="text-sm font-medium">{format(accountCreated, "MMMM d, yyyy")}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Status</span>
-                    <span className="text-sm font-medium">Meme Master</span>
-                  </div>
+                  {user?.location && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Location</span>
+                      <span className="text-sm font-medium">{user.location}</span>
+                    </div>
+                  )}
                 </div>
                 
-                <Button variant="outline" className="w-full mt-4">Edit Profile</Button>
+                <Button variant="outline" className="w-full mt-4" asChild>
+                  <Link to="/profile">Edit Profile</Link>
+                </Button>
               </CardContent>
             </Card>
             
@@ -331,6 +348,16 @@ const UserDashboard = () => {
                         <div className="flex space-x-2">
                           <Button 
                             variant="outline" 
+                            size="sm"
+                            asChild
+                          >
+                            <Link to={`/edit/${draft.id}`}>
+                              <PenTool className="h-4 w-4 mr-2" />
+                              Edit
+                            </Link>
+                          </Button>
+                          <Button 
+                            variant="outline" 
                             size="sm" 
                             onClick={() => setMemeToDelete(draft.id)}
                           >
@@ -354,13 +381,25 @@ const UserDashboard = () => {
                         />
                         
                         {draft.topText && (
-                          <div className="absolute top-2 left-0 right-0 text-center meme-text px-4 text-xl md:text-2xl">
+                          <div 
+                            className="absolute top-2 left-0 right-0 text-center meme-text px-4 text-xl md:text-2xl"
+                            style={{ 
+                              fontSize: `${draft.fontSize || 40}px`,
+                              color: draft.fontColor || '#FFFFFF'
+                            }}
+                          >
                             {draft.topText}
                           </div>
                         )}
                         
                         {draft.bottomText && (
-                          <div className="absolute bottom-2 left-0 right-0 text-center meme-text px-4 text-xl md:text-2xl">
+                          <div 
+                            className="absolute bottom-2 left-0 right-0 text-center meme-text px-4 text-xl md:text-2xl"
+                            style={{ 
+                              fontSize: `${draft.fontSize || 40}px`,
+                              color: draft.fontColor || '#FFFFFF'
+                            }}
+                          >
                             {draft.bottomText}
                           </div>
                         )}

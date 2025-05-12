@@ -29,6 +29,19 @@ export interface Meme {
   fontSize?: number;
   fontColor?: string;
   isDraft?: boolean;
+  isFlagged?: boolean;
+}
+
+export interface Comment {
+  id: string;
+  _id: string;
+  text: string;
+  createdAt: string;
+  user: {
+    id: string;
+    username: string;
+    avatar?: string;
+  };
 }
 
 interface FetchMemesOptions {
@@ -36,6 +49,11 @@ interface FetchMemesOptions {
   limit?: number;
   sort?: 'new' | 'top';
   time?: 'all' | '24h' | 'week';
+}
+
+interface FetchCommentsOptions {
+  page?: number;
+  limit?: number;
 }
 
 export const useMemes = () => {
@@ -66,7 +84,21 @@ export const useMemes = () => {
     tags: meme.tags,
     fontSize: meme.fontSize,
     fontColor: meme.fontColor,
-    isDraft: meme.isDraft
+    isDraft: meme.isDraft,
+    isFlagged: meme.isFlagged
+  });
+
+  // Format comment from API response
+  const formatComment = (comment: any): Comment => ({
+    id: comment._id,
+    _id: comment._id,
+    text: comment.text,
+    createdAt: comment.createdAt,
+    user: {
+      id: comment.user.id,
+      username: comment.user.username,
+      avatar: comment.user.avatar
+    }
   });
 
   const fetchMemes = async (options: FetchMemesOptions = {}) => {
@@ -270,6 +302,139 @@ export const useMemes = () => {
     }
   };
 
+  // Get comments for a meme
+  const getComments = async (memeId: string, options: FetchCommentsOptions = {}) => {
+    const { page = 1, limit = 20 } = options;
+    
+    try {
+      const response = await axios.get(`${API_URL}/comments/meme/${memeId}`, {
+        params: { page, limit }
+      });
+      
+      if (response.data.success) {
+        return {
+          comments: response.data.comments.map(formatComment),
+          total: response.data.total,
+          pages: response.data.pages
+        };
+      }
+      
+      return { comments: [], total: 0, pages: 0 };
+    } catch (err) {
+      console.error('Error fetching comments:', err);
+      toast.error("Failed to load comments");
+      return { comments: [], total: 0, pages: 0 };
+    }
+  };
+
+  // Add a comment to a meme
+  const addComment = async (memeId: string, text: string) => {
+    if (!isAuthenticated) {
+      toast.error("You must be logged in to comment");
+      return null;
+    }
+    
+    try {
+      const response = await axios.post(`${API_URL}/comments`, {
+        memeId,
+        text,
+        userAvatar: user?.avatar
+      });
+      
+      if (response.data.success) {
+        // Update meme comment count in state
+        setMemes(prevMemes => 
+          prevMemes.map(meme => {
+            if (meme.id === memeId) {
+              return {
+                ...meme,
+                commentCount: meme.commentCount + 1
+              };
+            }
+            return meme;
+          })
+        );
+        
+        return formatComment(response.data.comment);
+      }
+      
+      return null;
+    } catch (err: any) {
+      console.error('Error adding comment:', err);
+      toast.error(err.response?.data?.message || "Failed to add comment");
+      return null;
+    }
+  };
+
+  // Delete a comment
+  const deleteComment = async (commentId: string, memeId: string) => {
+    if (!isAuthenticated) {
+      return false;
+    }
+    
+    try {
+      const response = await axios.delete(`${API_URL}/comments/${commentId}`);
+      
+      if (response.data.success) {
+        // Update meme comment count in state
+        setMemes(prevMemes => 
+          prevMemes.map(meme => {
+            if (meme.id === memeId) {
+              return {
+                ...meme,
+                commentCount: Math.max(0, meme.commentCount - 1)
+              };
+            }
+            return meme;
+          })
+        );
+        
+        return true;
+      }
+      
+      return false;
+    } catch (err) {
+      console.error('Error deleting comment:', err);
+      toast.error("Failed to delete comment");
+      return false;
+    }
+  };
+
+  // Flag a meme
+  const flagMeme = async (memeId: string, reason: string) => {
+    if (!isAuthenticated) {
+      toast.error("You must be logged in to flag content");
+      return false;
+    }
+    
+    try {
+      const response = await axios.post(`${API_URL}/memes/${memeId}/flag`, { reason });
+      
+      if (response.data.success) {
+        // Update meme in state
+        setMemes(prevMemes => 
+          prevMemes.map(meme => {
+            if (meme.id === memeId) {
+              return {
+                ...meme,
+                isFlagged: response.data.isFlagged
+              };
+            }
+            return meme;
+          })
+        );
+        
+        return true;
+      }
+      
+      return false;
+    } catch (err: any) {
+      console.error('Error flagging meme:', err);
+      toast.error(err.response?.data?.message || "Failed to flag meme");
+      return false;
+    }
+  };
+
   return {
     memes,
     loading,
@@ -280,6 +445,10 @@ export const useMemes = () => {
     updateMeme,
     voteMeme,
     deleteMeme,
-    getUserMemes
+    getUserMemes,
+    getComments,
+    addComment,
+    deleteComment,
+    flagMeme
   };
 };
